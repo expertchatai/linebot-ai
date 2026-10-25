@@ -1,6 +1,6 @@
-import { GoogleGenAI } from "@google/genai";
 import { NextResponse } from "next/server";
 import { env } from "@/lib/env";
+import { gemini as client, THINKING } from "@/lib/gemini";
 import { parseRows } from "@/lib/parser";
 import { fetchSheetRows } from "@/lib/sheets";
 
@@ -30,8 +30,7 @@ export async function GET() {
   let gemini: { ok: boolean; model: string; error?: string };
   const model = env.geminiModel();
   try {
-    const ai = new GoogleGenAI({ apiKey: env.geminiApiKey() });
-    await ai.models.generateContent({ model, contents: "ping", config: { maxOutputTokens: 5 } });
+    await client().models.generateContent({ model, contents: "ping", config: { maxOutputTokens: 5, thinkingConfig: THINKING } });
     gemini = { ok: true, model };
   } catch (e) {
     gemini = { ok: false, model, error: message(e) };

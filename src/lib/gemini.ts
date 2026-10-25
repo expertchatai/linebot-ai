@@ -1,11 +1,14 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, ThinkingLevel } from "@google/genai";
 import { env } from "./env";
 import { formatFaq, getFaq } from "./faq";
 
 export const FALLBACK_REPLY = "ขออภัยค่ะ เรื่องนี้ขอให้เจ้าหน้าที่ตอบกลับนะคะ รบกวนรอสักครู่ค่ะ";
 
+// FAQ lookups don't need deep reasoning; minimal thinking keeps replies fast.
+export const THINKING = { thinkingLevel: ThinkingLevel.MINIMAL };
+
 let ai: GoogleGenAI | null = null;
-const gemini = () => (ai ??= new GoogleGenAI({ apiKey: env.geminiApiKey() }));
+export const gemini = () => (ai ??= new GoogleGenAI({ apiKey: env.geminiApiKey() }));
 
 function systemPrompt(faq: string): string {
   return `คุณคือแอดมินตอบแชท LINE ของร้าน Expert Watch (ศูนย์บริการซ่อมนาฬิกา)
@@ -25,7 +28,7 @@ export async function answer(question: string): Promise<string> {
   const res = await gemini().models.generateContent({
     model: env.geminiModel(),
     contents: question,
-    config: { systemInstruction: systemPrompt(formatFaq(faq)), temperature: 0.2 },
+    config: { systemInstruction: systemPrompt(formatFaq(faq)), temperature: 0.2, thinkingConfig: THINKING },
   });
   return res.text?.trim() || FALLBACK_REPLY;
 }
