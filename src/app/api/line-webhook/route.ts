@@ -1,5 +1,6 @@
 import { after, NextResponse, type NextRequest } from "next/server";
 import { answer, FALLBACK_REPLY } from "@/lib/gemini";
+import { addTurns, getHistory } from "@/lib/history";
 import { reply, showLoading, verifySignature } from "@/lib/line";
 
 export const runtime = "nodejs";
@@ -30,7 +31,8 @@ export async function POST(req: NextRequest) {
       if (userId) await showLoading(userId);
       let text = FALLBACK_REPLY;
       try {
-        text = await answer(question);
+        text = await answer(question, userId ? getHistory(userId) : []);
+        if (userId) addTurns(userId, { role: "user", text: question }, { role: "model", text });
       } catch (e) {
         console.error("[line-webhook] answer failed", e);
       }
