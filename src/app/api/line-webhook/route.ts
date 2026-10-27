@@ -2,9 +2,10 @@ import { after, NextResponse, type NextRequest } from "next/server";
 import { answer, FALLBACK_REPLY, isHandoff } from "@/lib/gemini";
 import { addTurns, getHistory } from "@/lib/history";
 import { getDisplayName, getImage, notifyAdmins, reply, showLoading, verifySignature } from "@/lib/line";
+import { enqueue, takeIfLatest, WAIT_MS } from "@/lib/pending";
 
 export const runtime = "nodejs";
-export const maxDuration = 30;
+export const maxDuration = 40;
 
 interface LineEvent {
   type: string;
@@ -29,24 +30,38 @@ export async function POST(req: NextRequest) {
       continue;
     }
     // Only answer 1:1 chats, so the bot stays quiet in the admin group.
-    if (event.source.type !== "user") continue;
-    const message = event.message;
-    if (event.type !== "message" || !message || !event.replyToken) continue;
-    if (message.type !== "text" && message.type !== "image") continue;
-    const { replyToken } = event;
-    // A photo has no text; this placeholder is what the bot remembers and what admins see.
-    const question = message.type === "image" ? "[ลูกค้าส่งรูปนาฬิกา]" : (message.text ?? "");
+    const { message, replyToken } = event;
     const userId = event.source.userId;
+    if (event.source.type !== "user" || !userId) continue;
+    if (event.type !== "message" || !message || !replyToken) continue;
+    if (message.type !== "text" && message.type !== "image") continue;
 
     // Respond to LINE right away; answer in the background.
     after(async () => {
-      if (userId) await showLoading(userId);
+      await showLoading(userId);
+      // Wait for a caption or more photos, then answer everything in one reply.
+      const pending = { id: message.id, type: message.type as "text" | "image", text: message.text };
+      let batch = [pending];
+      try {
+        await enqueue(userId, pending);
+        await new Promise((r) => setTimeout(r, WAIT_MS));
+        batch = await takeIfLatest(message.id, userId);
+      } catch (e) {
+        console.error("[line-webhook] batching failed, answering this message alone", e);
+      }
+      if (!batch.length) return; // A newer message will answer for this one.
+
+      const photos = batch.filter((m) => m.type === "image");
+      const texts = batch.filter((m) => m.type === "text").map((m) => m.text ?? "");
+      // A photo has no text; this placeholder is what the bot remembers and what admins see.
+      const question = [...(photos.length ? [`[ลูกค้าส่งรูปนาฬิกา ${photos.length} รูป]`] : []), ...texts].join("\n");
+
       const customerName = await getDisplayName(userId);
       let text = FALLBACK_REPLY;
       try {
-        const image = message.type === "image" ? await getImage(message.id) : undefined;
-        text = await answer(question, { history: userId ? await getHistory(userId) : [], image, customerName });
-        if (userId) await addTurns(userId, { role: "user", text: question }, { role: "model", text });
+        const images = await Promise.all(photos.map((p) => getImage(p.id)));
+        text = await answer(question, { history: await getHistory(userId), images, customerName });
+        await addTurns(userId, { role: "user", text: question }, { role: "model", text });
       } catch (e) {
         console.error("[line-webhook] answer failed", e);
       }

@@ -41,12 +41,16 @@ ${faq}`;
 
 export async function answer(
   question: string,
-  { history = [], image, customerName = "" }: { history?: Turn[]; image?: { data: string; mimeType: string }; customerName?: string } = {},
+  {
+    history = [],
+    images = [],
+    customerName = "",
+  }: { history?: Turn[]; images?: { data: string; mimeType: string }[]; customerName?: string } = {},
 ): Promise<string> {
   const faq = await getFaq();
   const contents = [
     ...history.map((t) => ({ role: t.role, parts: [{ text: t.text }] })),
-    { role: "user", parts: [...(image ? [{ inlineData: image }] : []), { text: question }] },
+    { role: "user", parts: [...images.map((inlineData) => ({ inlineData })), { text: question }] },
   ];
   const res = await gemini().models.generateContent({
     model: env.geminiModel(),

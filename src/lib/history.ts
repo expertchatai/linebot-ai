@@ -1,3 +1,5 @@
+import { hasRedis, redis } from "./redis";
+
 // Recent chat turns per LINE user, so follow-up questions make sense.
 // Stored in Upstash Redis when configured (survives deploys and cold starts);
 // otherwise kept in memory, which only lasts while one Vercel instance stays warm.
@@ -9,27 +11,11 @@ export interface Turn {
   text: string;
 }
 
-// Names set by the Vercel Upstash integration, or by Upstash directly.
-const redisUrl = () => process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL || "";
-const redisToken = () => process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN || "";
-
-async function redis(command: (string | number)[]): Promise<unknown> {
-  const res = await fetch(redisUrl(), {
-    method: "POST",
-    headers: { Authorization: `Bearer ${redisToken()}` },
-    body: JSON.stringify(command),
-    cache: "no-store",
-    signal: AbortSignal.timeout(5_000),
-  });
-  if (!res.ok) throw new Error(`Redis ${res.status}: ${(await res.text()).slice(0, 200)}`);
-  return ((await res.json()) as { result: unknown }).result;
-}
-
 const memory = new Map<string, { turns: Turn[]; at: number }>();
 const key = (userId: string) => `chat:${userId}`;
 
 export async function getHistory(userId: string): Promise<Turn[]> {
-  if (redisUrl()) {
+  if (hasRedis()) {
     try {
       const raw = await redis(["GET", key(userId)]);
       return typeof raw === "string" ? (JSON.parse(raw) as Turn[]) : [];
@@ -48,7 +34,7 @@ export async function getHistory(userId: string): Promise<Turn[]> {
 
 export async function addTurns(userId: string, ...turns: Turn[]) {
   const all = [...(await getHistory(userId)), ...turns].slice(-MAX_TURNS * 2);
-  if (redisUrl()) {
+  if (hasRedis()) {
     try {
       await redis(["SET", key(userId), JSON.stringify(all), "EX", EXPIRE_SECONDS]);
     } catch (e) {

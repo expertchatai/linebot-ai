@@ -30,7 +30,7 @@ export async function reply(replyToken: string, text: string) {
 /** Shows the "typing…" dots while Gemini is thinking. */
 export async function showLoading(userId: string) {
   try {
-    await line().showLoadingAnimation({ chatId: userId, loadingSeconds: 10 });
+    await line().showLoadingAnimation({ chatId: userId, loadingSeconds: 20 });
   } catch {
     // Cosmetic only.
   }

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { env } from "@/lib/env";
 import { gemini as client, THINKING } from "@/lib/gemini";
 import { parseRows } from "@/lib/parser";
+import { hasRedis } from "@/lib/redis";
 import { fetchSheetRows } from "@/lib/sheets";
 
 export const runtime = "nodejs";
@@ -19,7 +20,7 @@ export async function GET() {
     GOOGLE_API_KEY: !!process.env.GOOGLE_API_KEY,
     GOOGLE_SERVICE_ACCOUNT_JSON: !!process.env.GOOGLE_SERVICE_ACCOUNT_JSON,
     ADMIN_GROUP_ID: !!process.env.ADMIN_GROUP_ID,
-    REDIS: !!(process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL),
+    REDIS: hasRedis(),
   };
 
   let sheet: { ok: boolean; faqCount?: number; error?: string };
