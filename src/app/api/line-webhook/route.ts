@@ -5,7 +5,7 @@ import { getDisplayName, getImage, notifyAdmins, reply, showLoading, verifySigna
 import { enqueue, takeIfLatest, WAIT_MS } from "@/lib/pending";
 
 export const runtime = "nodejs";
-export const maxDuration = 40;
+export const maxDuration = 60;
 
 interface LineEvent {
   type: string;
