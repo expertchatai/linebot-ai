@@ -2,7 +2,7 @@ import { after, NextResponse, type NextRequest } from "next/server";
 import { answer, FALLBACK_REPLY, isHandoff } from "@/lib/gemini";
 import { addTurns, getHistory } from "@/lib/history";
 import { getDisplayName, getImage, notifyAdmins, reply, showLoading, verifySignature } from "@/lib/line";
-import { enqueue, takeIfLatest, WAIT_MS } from "@/lib/pending";
+import { enqueue, takeIfLatest, waitMs } from "@/lib/pending";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
       let batch = [pending];
       try {
         await enqueue(userId, pending);
-        await new Promise((r) => setTimeout(r, WAIT_MS));
+        await new Promise((r) => setTimeout(r, waitMs(pending.type)));
         batch = await takeIfLatest(message.id, userId);
       } catch (e) {
         console.error("[line-webhook] batching failed, answering this message alone", e);

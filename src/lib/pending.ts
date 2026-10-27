@@ -2,7 +2,8 @@ import { hasRedis, redis } from "./redis";
 
 // LINE delivers a photo and its caption as separate messages. Each message is queued here,
 // and only the last one to arrive within the wait window answers, using everything queued.
-export const WAIT_MS = 10_000;
+// Photos take a while to send (and often come in a set), so they get a longer window than text.
+export const waitMs = (type: "text" | "image") => (type === "image" ? 10_000 : 3_000);
 
 export interface PendingMessage {
   id: string;
