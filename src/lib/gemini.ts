@@ -5,6 +5,9 @@ import type { Turn } from "./history";
 
 export const FALLBACK_REPLY = "ขออภัยค่ะ เรื่องนี้ขอให้เจ้าหน้าที่ตอบกลับนะคะ รบกวนรอสักครู่ค่ะ";
 
+/** Gemini may reword the fallback slightly, so match its key phrase. */
+export const isHandoff = (text: string) => text.includes("ขอให้เจ้าหน้าที่ตอบกลับ");
+
 // A little reasoning to connect follow-ups to earlier messages, without slowing replies much.
 export const THINKING = { thinkingLevel: ThinkingLevel.LOW };
 

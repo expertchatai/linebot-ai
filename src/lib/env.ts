@@ -11,6 +11,8 @@ function optional(name: string, fallback = ""): string {
 export const env = {
   lineChannelSecret: () => required("LINE_CHANNEL_SECRET"),
   lineAccessToken: () => required("LINE_CHANNEL_ACCESS_TOKEN"),
+  /** LINE group that gets a message whenever the bot hands a customer over to staff. */
+  adminGroupId: () => optional("ADMIN_GROUP_ID"),
 
   geminiApiKey: () => required("GEMINI_API_KEY"),
   geminiModel: () => optional("GEMINI_MODEL", "gemini-3.5-flash"),

@@ -1,7 +1,7 @@
 import { after, NextResponse, type NextRequest } from "next/server";
-import { answer, FALLBACK_REPLY } from "@/lib/gemini";
+import { answer, FALLBACK_REPLY, isHandoff } from "@/lib/gemini";
 import { addTurns, getHistory } from "@/lib/history";
-import { reply, showLoading, verifySignature } from "@/lib/line";
+import { notifyAdmins, reply, showLoading, verifySignature } from "@/lib/line";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -9,7 +9,7 @@ export const maxDuration = 30;
 interface LineEvent {
   type: string;
   replyToken?: string;
-  source: { type: string; userId?: string };
+  source: { type: string; userId?: string; groupId?: string };
   message?: { type: string; text?: string };
 }
 
@@ -21,6 +21,15 @@ export async function POST(req: NextRequest) {
 
   const { events = [] } = JSON.parse(body) as { events?: LineEvent[] };
   for (const event of events) {
+    // Added to a group: post its ID so it can be set as ADMIN_GROUP_ID.
+    if (event.type === "join" && event.source.groupId && event.replyToken) {
+      const { replyToken, source } = event;
+      const text = `Group ID ของกลุ่มนี้:\n${source.groupId}\n\nนำไปใส่ใน Vercel เป็น ADMIN_GROUP_ID เพื่อรับแจ้งเตือนเมื่อลูกค้ารอเจ้าหน้าที่`;
+      after(() => reply(replyToken, text).catch((e) => console.error("[line-webhook] join reply failed", e)));
+      continue;
+    }
+    // Only answer 1:1 chats, so the bot stays quiet in the admin group.
+    if (event.source.type !== "user") continue;
     if (event.type !== "message" || event.message?.type !== "text" || !event.replyToken) continue;
     const { replyToken } = event;
     const question = event.message.text ?? "";
@@ -40,6 +49,13 @@ export async function POST(req: NextRequest) {
         await reply(replyToken, text);
       } catch (e) {
         console.error("[line-webhook] reply failed", e);
+      }
+      if (isHandoff(text)) {
+        try {
+          await notifyAdmins(userId, question);
+        } catch (e) {
+          console.error("[line-webhook] admin alert failed", e);
+        }
       }
     });
   }
