@@ -18,6 +18,8 @@ export async function GET() {
     GEMINI_API_KEY: !!process.env.GEMINI_API_KEY,
     GOOGLE_API_KEY: !!process.env.GOOGLE_API_KEY,
     GOOGLE_SERVICE_ACCOUNT_JSON: !!process.env.GOOGLE_SERVICE_ACCOUNT_JSON,
+    ADMIN_GROUP_ID: !!process.env.ADMIN_GROUP_ID,
+    REDIS: !!(process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL),
   };
 
   let sheet: { ok: boolean; faqCount?: number; error?: string };

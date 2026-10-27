@@ -1,25 +1,60 @@
-// Recent chat turns per LINE user, kept in memory so follow-up questions make sense.
-// Lives as long as the Vercel instance stays warm; a cold start simply starts a fresh conversation.
+// Recent chat turns per LINE user, so follow-up questions make sense.
+// Stored in Upstash Redis when configured (survives deploys and cold starts);
+// otherwise kept in memory, which only lasts while one Vercel instance stays warm.
 const MAX_TURNS = 6;
-const EXPIRE_MS = 30 * 60 * 1000;
+const EXPIRE_SECONDS = 30 * 60;
 
 export interface Turn {
   role: "user" | "model";
   text: string;
 }
 
-const chats = new Map<string, { turns: Turn[]; at: number }>();
+// Names set by the Vercel Upstash integration, or by Upstash directly.
+const redisUrl = () => process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL || "";
+const redisToken = () => process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN || "";
 
-export function getHistory(userId: string): Turn[] {
-  const chat = chats.get(userId);
-  if (!chat || Date.now() - chat.at > EXPIRE_MS) {
-    chats.delete(userId);
+async function redis(command: (string | number)[]): Promise<unknown> {
+  const res = await fetch(redisUrl(), {
+    method: "POST",
+    headers: { Authorization: `Bearer ${redisToken()}` },
+    body: JSON.stringify(command),
+    cache: "no-store",
+    signal: AbortSignal.timeout(5_000),
+  });
+  if (!res.ok) throw new Error(`Redis ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  return ((await res.json()) as { result: unknown }).result;
+}
+
+const memory = new Map<string, { turns: Turn[]; at: number }>();
+const key = (userId: string) => `chat:${userId}`;
+
+export async function getHistory(userId: string): Promise<Turn[]> {
+  if (redisUrl()) {
+    try {
+      const raw = await redis(["GET", key(userId)]);
+      return typeof raw === "string" ? (JSON.parse(raw) as Turn[]) : [];
+    } catch (e) {
+      console.error("[history] Redis read failed", e);
+      return [];
+    }
+  }
+  const chat = memory.get(userId);
+  if (!chat || Date.now() - chat.at > EXPIRE_SECONDS * 1000) {
+    memory.delete(userId);
     return [];
   }
   return chat.turns;
 }
 
-export function addTurns(userId: string, ...turns: Turn[]) {
-  const all = [...getHistory(userId), ...turns].slice(-MAX_TURNS * 2);
-  chats.set(userId, { turns: all, at: Date.now() });
+export async function addTurns(userId: string, ...turns: Turn[]) {
+  const all = [...(await getHistory(userId)), ...turns].slice(-MAX_TURNS * 2);
+  if (redisUrl()) {
+    try {
+      await redis(["SET", key(userId), JSON.stringify(all), "EX", EXPIRE_SECONDS]);
+    } catch (e) {
+      console.error("[history] Redis write failed", e);
+    }
+    return;
+  }
+  memory.set(userId, { turns: all, at: Date.now() });
 }

@@ -44,8 +44,8 @@ export async function POST(req: NextRequest) {
       let text = FALLBACK_REPLY;
       try {
         const image = message.type === "image" ? await getImage(message.id) : undefined;
-        text = await answer(question, userId ? getHistory(userId) : [], image);
-        if (userId) addTurns(userId, { role: "user", text: question }, { role: "model", text });
+        text = await answer(question, userId ? await getHistory(userId) : [], image);
+        if (userId) await addTurns(userId, { role: "user", text: question }, { role: "model", text });
       } catch (e) {
         console.error("[line-webhook] answer failed", e);
       }
