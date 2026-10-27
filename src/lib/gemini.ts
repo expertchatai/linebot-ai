@@ -14,7 +14,7 @@ export const THINKING = { thinkingLevel: ThinkingLevel.LOW };
 let ai: GoogleGenAI | null = null;
 export const gemini = () => (ai ??= new GoogleGenAI({ apiKey: env.geminiApiKey() }));
 
-function systemPrompt(faq: string): string {
+function systemPrompt(faq: string, customerName: string): string {
   return `คุณคือแอดมินตอบแชท LINE ของร้าน Expert Watch (ศูนย์บริการซ่อมนาฬิกา)
 
 กฎ:
@@ -27,7 +27,8 @@ function systemPrompt(faq: string): string {
   3. ถ้า FAQ มีบริการหรือราคาของแบรนด์/รุ่นนั้น ให้ตอบได้เลย ถ้าไม่มี ให้ตอบว่า: "${FALLBACK_REPLY}"
   4. ถ้าดูแบรนด์/รุ่นจากรูปไม่ออก ให้ขอรูปหน้าปัดที่ชัดขึ้น ถ้าเคยขอรูปไปแล้วและยังดูไม่ออก ให้ตอบว่า: "${FALLBACK_REPLY}"
 - ถ้า FAQ ไม่มีคำตอบ ให้ตอบว่า: "${FALLBACK_REPLY}"
-- คุณเป็นแอดมินผู้ชาย ใช้ "ครับ" ลงท้ายทุกคำตอบ (ห้ามใช้ "ค่ะ" หรือ "คะ") แทนตัวเองว่า "ผม" หรือ "ทางร้าน" เรียกลูกค้าว่า "คุณลูกค้า"
+- คุณเป็นแอดมินผู้ชาย ลงท้ายทุกคำตอบด้วย "ครับ" (ห้ามใช้ "ค่ะ" หรือ "คะ") แทนตัวเองว่า "แอดมิน"
+- เรียกลูกค้าว่า ${customerName ? `"คุณ${customerName}"` : `"คุณลูกค้า"`}
 - ตอบสั้น สุภาพ เป็นกันเอง 1–3 ประโยค ตอบภาษาเดียวกับที่ลูกค้าถาม
 
 FAQ:
@@ -36,8 +37,7 @@ ${faq}`;
 
 export async function answer(
   question: string,
-  history: Turn[] = [],
-  image?: { data: string; mimeType: string },
+  { history = [], image, customerName = "" }: { history?: Turn[]; image?: { data: string; mimeType: string }; customerName?: string } = {},
 ): Promise<string> {
   const faq = await getFaq();
   const contents = [
@@ -47,7 +47,7 @@ export async function answer(
   const res = await gemini().models.generateContent({
     model: env.geminiModel(),
     contents,
-    config: { systemInstruction: systemPrompt(formatFaq(faq)), temperature: 0.2, thinkingConfig: THINKING },
+    config: { systemInstruction: systemPrompt(formatFaq(faq), customerName), temperature: 0.2, thinkingConfig: THINKING },
   });
   return res.text?.trim() || FALLBACK_REPLY;
 }

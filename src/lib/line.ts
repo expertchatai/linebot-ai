@@ -36,18 +36,21 @@ export async function showLoading(userId: string) {
   }
 }
 
+/** The customer's LINE display name, or "" if it can't be read. */
+export async function getDisplayName(userId: string | undefined): Promise<string> {
+  if (!userId) return "";
+  try {
+    return (await line().getProfile(userId)).displayName;
+  } catch {
+    // Name is only for a friendlier reply; carry on without it.
+    return "";
+  }
+}
+
 /** Tells the admin group that a customer is waiting for a human. Does nothing until ADMIN_GROUP_ID is set. */
-export async function notifyAdmins(userId: string | undefined, question: string) {
+export async function notifyAdmins(name: string, question: string) {
   const groupId = env.adminGroupId();
   if (!groupId) return;
-  let name = "ลูกค้า";
-  if (userId) {
-    try {
-      name = (await line().getProfile(userId)).displayName;
-    } catch {
-      // Profile is only for display; send the alert anyway.
-    }
-  }
-  const text = `🔔 มีลูกค้ารอเจ้าหน้าที่ตอบ\nชื่อ: ${name}\nคำถาม: ${question}\n\nเข้าไปตอบใน LINE OA Manager → แชท`;
+  const text = `🔔 มีลูกค้ารอเจ้าหน้าที่ตอบ\nชื่อ: ${name || "ลูกค้า"}\nคำถาม: ${question}\n\nเข้าไปตอบใน LINE OA Manager → แชท`;
   await line().pushMessage({ to: groupId, messages: [{ type: "text", text: text.slice(0, 5000) }] });
 }

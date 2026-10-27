@@ -1,7 +1,7 @@
 import { after, NextResponse, type NextRequest } from "next/server";
 import { answer, FALLBACK_REPLY, isHandoff } from "@/lib/gemini";
 import { addTurns, getHistory } from "@/lib/history";
-import { getImage, notifyAdmins, reply, showLoading, verifySignature } from "@/lib/line";
+import { getDisplayName, getImage, notifyAdmins, reply, showLoading, verifySignature } from "@/lib/line";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -41,10 +41,11 @@ export async function POST(req: NextRequest) {
     // Respond to LINE right away; answer in the background.
     after(async () => {
       if (userId) await showLoading(userId);
+      const customerName = await getDisplayName(userId);
       let text = FALLBACK_REPLY;
       try {
         const image = message.type === "image" ? await getImage(message.id) : undefined;
-        text = await answer(question, userId ? await getHistory(userId) : [], image);
+        text = await answer(question, { history: userId ? await getHistory(userId) : [], image, customerName });
         if (userId) await addTurns(userId, { role: "user", text: question }, { role: "model", text });
       } catch (e) {
         console.error("[line-webhook] answer failed", e);
@@ -56,7 +57,7 @@ export async function POST(req: NextRequest) {
       }
       if (isHandoff(text)) {
         try {
-          await notifyAdmins(userId, question);
+          await notifyAdmins(customerName, question);
         } catch (e) {
           console.error("[line-webhook] admin alert failed", e);
         }
