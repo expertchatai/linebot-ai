@@ -4,6 +4,16 @@ import { env } from "./env";
 let client: messagingApi.MessagingApiClient | null = null;
 const line = () => (client ??= new messagingApi.MessagingApiClient({ channelAccessToken: env.lineAccessToken() }));
 
+let blobClient: messagingApi.MessagingApiBlobClient | null = null;
+const blob = () => (blobClient ??= new messagingApi.MessagingApiBlobClient({ channelAccessToken: env.lineAccessToken() }));
+
+/** Downloads a photo the customer sent, as base64 for Gemini. LINE stores chat photos as JPEG. */
+export async function getImage(messageId: string): Promise<{ data: string; mimeType: string }> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of await blob().getMessageContent(messageId)) chunks.push(Buffer.from(chunk));
+  return { data: Buffer.concat(chunks).toString("base64"), mimeType: "image/jpeg" };
+}
+
 export function verifySignature(body: string, signature: string | null): boolean {
   if (!signature) return false;
   try {

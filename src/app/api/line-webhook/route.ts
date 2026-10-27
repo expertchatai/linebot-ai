@@ -1,7 +1,7 @@
 import { after, NextResponse, type NextRequest } from "next/server";
 import { answer, FALLBACK_REPLY, isHandoff } from "@/lib/gemini";
 import { addTurns, getHistory } from "@/lib/history";
-import { notifyAdmins, reply, showLoading, verifySignature } from "@/lib/line";
+import { getImage, notifyAdmins, reply, showLoading, verifySignature } from "@/lib/line";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -10,7 +10,7 @@ interface LineEvent {
   type: string;
   replyToken?: string;
   source: { type: string; userId?: string; groupId?: string };
-  message?: { type: string; text?: string };
+  message?: { id: string; type: string; text?: string };
 }
 
 export async function POST(req: NextRequest) {
@@ -30,9 +30,12 @@ export async function POST(req: NextRequest) {
     }
     // Only answer 1:1 chats, so the bot stays quiet in the admin group.
     if (event.source.type !== "user") continue;
-    if (event.type !== "message" || event.message?.type !== "text" || !event.replyToken) continue;
+    const message = event.message;
+    if (event.type !== "message" || !message || !event.replyToken) continue;
+    if (message.type !== "text" && message.type !== "image") continue;
     const { replyToken } = event;
-    const question = event.message.text ?? "";
+    // A photo has no text; this placeholder is what the bot remembers and what admins see.
+    const question = message.type === "image" ? "[ลูกค้าส่งรูปนาฬิกา]" : (message.text ?? "");
     const userId = event.source.userId;
 
     // Respond to LINE right away; answer in the background.
@@ -40,7 +43,8 @@ export async function POST(req: NextRequest) {
       if (userId) await showLoading(userId);
       let text = FALLBACK_REPLY;
       try {
-        text = await answer(question, userId ? getHistory(userId) : []);
+        const image = message.type === "image" ? await getImage(message.id) : undefined;
+        text = await answer(question, userId ? getHistory(userId) : [], image);
         if (userId) addTurns(userId, { role: "user", text: question }, { role: "model", text });
       } catch (e) {
         console.error("[line-webhook] answer failed", e);

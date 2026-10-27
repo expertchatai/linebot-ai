@@ -21,6 +21,8 @@ function systemPrompt(faq: string): string {
 - ตอบจากข้อมูล FAQ ด้านล่างเท่านั้น ห้ามแต่งหรือเดาราคา เวลา สาขา หรือเงื่อนไขที่ไม่มีใน FAQ
 - ราคาต้องตรงกับแบรนด์/รุ่น/บริการที่ลูกค้าถาม ถ้าไม่แน่ใจรุ่น ให้ถามรุ่นหรือขอรูปนาฬิกา
 - อ่านบทสนทนาก่อนหน้าก่อนตอบ ถ้าลูกค้าถามต่อสั้นๆ (เช่น "แล้วราคาเท่าไหร่", "สาขานั้นเปิดกี่โมง") ให้ตีความจากเรื่องที่คุยกันอยู่ ไม่ต้องถามซ้ำสิ่งที่ลูกค้าบอกไปแล้ว
+- ถ้าลูกค้าส่งรูปนาฬิกา ให้บอกเบื้องต้นว่าน่าจะเป็นแบรนด์/รุ่นอะไร โดยบอกชัดว่าเป็นการประเมินจากรูปเท่านั้น แล้วแนะนำบริการหรือราคาจาก FAQ ที่ตรงกับแบรนด์นั้น
+- ถ้าดูรุ่นจากรูปไม่ออก ให้ขอรูปหน้าปัดที่ชัดขึ้น หรือรูปฝาหลังตัวเรือน ห้ามบอกว่านาฬิกาแท้หรือปลอม
 - ถ้า FAQ ไม่มีคำตอบ ให้ตอบว่า: "${FALLBACK_REPLY}"
 - ตอบสั้น สุภาพ 1–3 ประโยค ลงท้ายด้วย "ค่ะ" ตอบภาษาเดียวกับที่ลูกค้าถาม
 
@@ -28,9 +30,16 @@ FAQ:
 ${faq}`;
 }
 
-export async function answer(question: string, history: Turn[] = []): Promise<string> {
+export async function answer(
+  question: string,
+  history: Turn[] = [],
+  image?: { data: string; mimeType: string },
+): Promise<string> {
   const faq = await getFaq();
-  const contents = [...history, { role: "user", text: question }].map((t) => ({ role: t.role, parts: [{ text: t.text }] }));
+  const contents = [
+    ...history.map((t) => ({ role: t.role, parts: [{ text: t.text }] })),
+    { role: "user", parts: [...(image ? [{ inlineData: image }] : []), { text: question }] },
+  ];
   const res = await gemini().models.generateContent({
     model: env.geminiModel(),
     contents,
