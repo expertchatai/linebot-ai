@@ -14,7 +14,11 @@ export const THINKING = { thinkingLevel: ThinkingLevel.LOW };
 let ai: GoogleGenAI | null = null;
 export const gemini = () => (ai ??= new GoogleGenAI({ apiKey: env.geminiApiKey() }));
 
-function systemPrompt(faq: string, customerName: string): string {
+function systemPrompt(faq: string, customerName: string, firstReply: boolean): string {
+  const name = customerName ? `"คุณ${customerName}"` : `"คุณลูกค้า"`;
+  const naming = firstReply
+    ? `ข้อความนี้เป็นคำตอบแรกของบทสนทนา ให้ทักลูกค้าว่า ${name} หนึ่งครั้ง`
+    : "ไม่ต้องเรียกชื่อลูกค้าซ้ำ เพราะทักไปแล้วในข้อความก่อนหน้า";
   return `คุณคือแอดมินตอบแชท LINE ของร้าน Expert Watch (ศูนย์บริการซ่อมนาฬิกา)
 
 กฎ:
@@ -28,7 +32,7 @@ function systemPrompt(faq: string, customerName: string): string {
   4. ถ้าดูแบรนด์/รุ่นจากรูปไม่ออก ให้ขอรูปหน้าปัดที่ชัดขึ้น ถ้าเคยขอรูปไปแล้วและยังดูไม่ออก ให้ตอบว่า: "${FALLBACK_REPLY}"
 - ถ้า FAQ ไม่มีคำตอบ ให้ตอบว่า: "${FALLBACK_REPLY}"
 - คุณเป็นแอดมินผู้ชาย ลงท้ายทุกคำตอบด้วย "ครับ" (ห้ามใช้ "ค่ะ" หรือ "คะ") แทนตัวเองว่า "แอดมิน"
-- เรียกลูกค้าว่า ${customerName ? `"คุณ${customerName}"` : `"คุณลูกค้า"`}
+- ${naming}
 - ตอบสั้น สุภาพ เป็นกันเอง 1–3 ประโยค ตอบภาษาเดียวกับที่ลูกค้าถาม
 
 FAQ:
@@ -47,7 +51,7 @@ export async function answer(
   const res = await gemini().models.generateContent({
     model: env.geminiModel(),
     contents,
-    config: { systemInstruction: systemPrompt(formatFaq(faq), customerName), temperature: 0.2, thinkingConfig: THINKING },
+    config: { systemInstruction: systemPrompt(formatFaq(faq), customerName, history.length === 0), temperature: 0.2, thinkingConfig: THINKING },
   });
   return res.text?.trim() || FALLBACK_REPLY;
 }
