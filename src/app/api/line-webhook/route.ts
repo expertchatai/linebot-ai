@@ -2,7 +2,7 @@ import { after, NextResponse, type NextRequest } from "next/server";
 import { answer, FALLBACK_REPLY, isHandoff } from "@/lib/gemini";
 import { addTurns, getHistory } from "@/lib/history";
 import { getDisplayName, getImage, notifyAdmins, reply, showLoading, verifySignature } from "@/lib/line";
-import { enqueue, takeIfLatest, waitMs } from "@/lib/pending";
+import { enqueue, takeIfLatest, waitMs, type PendingMessage } from "@/lib/pending";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -40,8 +40,8 @@ export async function POST(req: NextRequest) {
     after(async () => {
       await showLoading(userId);
       // Wait for a caption or more photos, then answer everything in one reply.
-      const pending = { id: message.id, type: message.type as "text" | "image", text: message.text };
-      let batch = [pending];
+      const pending: PendingMessage = { id: message.id, type: message.type as "text" | "image", text: message.text };
+      let batch: PendingMessage[] = [pending];
       try {
         await enqueue(userId, pending);
         await new Promise((r) => setTimeout(r, waitMs(pending.type)));
