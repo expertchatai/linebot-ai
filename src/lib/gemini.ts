@@ -5,6 +5,14 @@ import type { Turn } from "./history";
 
 export const FALLBACK_REPLY = "รบกวนรอทางเจ้าหน้าที่ตอบกลับสักครู่ครับ";
 
+/** Gemini puts this between chat bubbles when a reply should be sent as separate messages. */
+const BUBBLE_BREAK = "[[NEXT]]";
+
+export function splitBubbles(text: string): string[] {
+  const bubbles = text.split(BUBBLE_BREAK).map((t) => t.trim()).filter(Boolean);
+  return bubbles.length ? bubbles : [FALLBACK_REPLY];
+}
+
 /** Gemini may reword the fallback slightly, so match its key phrase. */
 export const isHandoff = (text: string) => text.includes("เจ้าหน้าที่ตอบกลับ");
 
@@ -30,6 +38,7 @@ function systemPrompt(faq: string, customerName: string, firstReply: boolean): s
   2. ดูจากบทสนทนาว่าลูกค้าต้องการบริการอะไร (เช่น เปลี่ยนแบต ซ่อม ล้างเครื่อง) ถ้ายังไม่ได้บอก ให้ถามกลับว่าต้องการรับบริการอะไร
   3. ถ้า FAQ มีบริการหรือราคาของแบรนด์/รุ่นนั้น ให้ตอบได้เลย ถ้าไม่มี ให้ตอบว่า: "${FALLBACK_REPLY}"
   4. ถ้าดูแบรนด์/รุ่นจากรูปไม่ออก ให้ขอรูปหน้าปัดที่ชัดขึ้น ถ้าเคยขอรูปไปแล้วและยังดูไม่ออก ให้ตอบว่า: "${FALLBACK_REPLY}"
+- ถ้าบริการที่ลูกค้าถามมีให้บริการหลายสาขา ให้ตอบรายชื่อสาขาก่อน แล้วขึ้นข้อความใหม่โดยใส่ ${BUBBLE_BREAK} คั่น ตามด้วยคำถามว่า "คุณลูกค้าสะดวกเข้ารับบริการสาขาไหนครับ" (ถ้าลูกค้าบอกสาขาที่สะดวกแล้ว ไม่ต้องถามซ้ำ)
 - ถ้า FAQ ไม่มีคำตอบ ให้ตอบว่า: "${FALLBACK_REPLY}"
 - คุณเป็นแอดมินผู้ชาย ลงท้ายทุกคำตอบด้วย "ครับ" (ห้ามใช้ "ค่ะ" หรือ "คะ") แทนตัวเองว่า "แอดมิน"
 - ${naming}

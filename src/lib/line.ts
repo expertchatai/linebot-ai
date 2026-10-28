@@ -23,8 +23,10 @@ export function verifySignature(body: string, signature: string | null): boolean
   }
 }
 
-export async function reply(replyToken: string, text: string) {
-  await line().replyMessage({ replyToken, messages: [{ type: "text", text: text.slice(0, 5000) }] });
+/** Sends up to 5 chat bubbles in one reply (LINE's limit). */
+export async function reply(replyToken: string, texts: string[]) {
+  const messages = texts.slice(0, 5).map((text) => ({ type: "text" as const, text: text.slice(0, 5000) }));
+  await line().replyMessage({ replyToken, messages });
 }
 
 /** Shows the "typing…" dots while Gemini is thinking. */

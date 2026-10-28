@@ -1,5 +1,5 @@
 import { after, NextResponse, type NextRequest } from "next/server";
-import { answer, FALLBACK_REPLY, isHandoff } from "@/lib/gemini";
+import { answer, FALLBACK_REPLY, isHandoff, splitBubbles } from "@/lib/gemini";
 import { addTurns, getHistory } from "@/lib/history";
 import { getDisplayName, getImage, notifyAdmins, reply, showLoading, verifySignature } from "@/lib/line";
 import { enqueue, takeIfLatest, waitMs, type PendingMessage } from "@/lib/pending";
@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
     if (event.type === "join" && event.source.groupId && event.replyToken) {
       const { replyToken, source } = event;
       const text = `Group ID ของกลุ่มนี้:\n${source.groupId}\n\nนำไปใส่ใน Vercel เป็น ADMIN_GROUP_ID เพื่อรับแจ้งเตือนเมื่อลูกค้ารอเจ้าหน้าที่`;
-      after(() => reply(replyToken, text).catch((e) => console.error("[line-webhook] join reply failed", e)));
+      after(() => reply(replyToken, [text]).catch((e) => console.error("[line-webhook] join reply failed", e)));
       continue;
     }
     // Only answer 1:1 chats, so the bot stays quiet in the admin group.
@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
         console.error("[line-webhook] answer failed", e);
       }
       try {
-        await reply(replyToken, text);
+        await reply(replyToken, splitBubbles(text));
       } catch (e) {
         console.error("[line-webhook] reply failed", e);
       }
